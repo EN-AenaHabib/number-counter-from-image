@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#0f0f1a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>ExamScan</title>
+<style>
+:root {
+  --bg:      #0f0f1a;
+  --card:    #1a1a2e;
+  --card2:   #16213e;
+  --accent:  #7c6bff;
+  --accent2: #a78bfa;
+  --green:   #22c55e;
+  --red:     #ef4444;
+  --yellow:  #f59e0b;
+  --blue:    #60a5fa;
+  --text:    #e2e8f0;
+  --muted:   #94a3b8;
+  --border:  #2d2d4e;
+  --r:       16px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* ── Header ── */
+.hdr {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  z-index: 10;
+}
+.hdr-title { font-size: 18px; font-weight: 700; color: var(--accent2); }
+.hdr-sub   { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* ── Camera viewport ── */
+.cam-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  min-height: 0;
+}
+#video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Scanning frame overlay */
+.scan-frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.scan-box {
+  width: 82%;
+  max-width: 340px;
+  aspect-ratio: 1.4/1;
+  border: 2px solid rgba(124,107,255,0.7);
+  border-radius: 12px;
+  position: relative;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.38);
+}
+/* Corner markers */
+.scan-box::before, .scan-box::after,
+.scan-box .c2::before, .scan-box .c2::after {
+  content:''; position:absolute;
+  width:22px; height:22px;
+  border-color: var(--accent2);
+  border-style: solid;
+}
+.scan-box::before   { top:-2px; left:-2px;  border-width:3px 0 0 3px; border-radius:8px 0 0 0; }
+.scan-box::after    { top:-2px; right:-2px; border-width:3px 3px 0 0; border-radius:0 8px 0 0; }
+.scan-box .c2::before  { bottom:-2px; left:-2px;  border-width:0 0 3px 3px; border-radius:0 0 0 8px; }
+.scan-box .c2::after   { bottom:-2px; right:-2px; border-width:0 3px 3px 0; border-radius:0 0 8px 0; }
+
+/* Scanning animation line */
+.scan-line {
+  position: absolute;
+  left: 4px; right: 4px; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  border-radius: 1px;
+  animation: scanMove 2s ease-in-out infinite;
+  opacity: 0;
+  transition: opacity .3s;
+}
+.scanning .scan-line { opacity: 1; }
+@keyframes scanMove {
+  0%   { top: 8px;  }
+  50%  { top: calc(100% - 10px); }
+  100% { top: 8px;  }
+}
+
+.scan-hint {
+  position: absolute;
+  bottom: -32px;
+  left: 50%; transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+}
+
+/* Status badge on camera */
+.cam-status {
+  position: absolute;
+  top: 12px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.65);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: all .3s;
+}
+.cam-status.scanning {
+  border-color: var(--accent);
+  color: var(--accent2);
+}
+
+/* ── Bottom panel ── */
+.bottom {
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  padding: 14px 16px 20px;
+  flex-shrink: 0;
+}
+
+/* Mode tabs */
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tab {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .18s;
+  color: var(--muted);
+}
+.tab .t-icon  { font-size: 20px; display: block; }
+.tab .t-label { font-size: 13px; font-weight: 600; margin-top: 3px; }
+.tab.active   { border-color: var(--accent); color: var(--text); background: #1e1b4b; }
+
+/* Recount input */
+.recount-input {
+  display: none;
+  margin-bottom: 12px;
+}
+.recount-input.show { display: flex; align-items: center; gap: 10px; }
+.recount-input label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.recount-input input {
+  flex: 1;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+}
+.recount-input input:focus { border-color: var(--accent); }
+
+/* Scan button */
+.btn-scan {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--accent), #6d28d9);
+  border: none;
+  border-radius: var(--r);
+  color: white;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: .3px;
+  transition: transform .12s, opacity .2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-scan:active { transform: scale(0.97); }
+.btn-scan:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── Overlay popup ── */
+.overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.78);
+  z-index: 200;
+  align-items: flex-end;
+  justify-content: center;
+}
+.overlay.show { display: flex; }
+.popup {
+  background: var(--card);
+  border-radius: 24px 24px 0 0;
+  width: 100%; max-width: 480px;
+  padding: 20px 20px 36px;
+  animation: slideUp .28s ease;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.popup-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 18px;
+}
+
+/* Result pieces */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  margin-bottom: 14px;
+}
+.badge-purple { background:#1e1b4b; border:1px solid var(--accent); color:var(--accent2); }
+.badge-green  { background:rgba(34,197,94,.1); border:1px solid var(--green); color:var(--green); }
+.badge-red    { background:rgba(239,68,68,.1); border:1px solid var(--red);   color:var(--red); }
+
+.eq-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.9;
+  word-break: break-all;
+}
+.eq-nums  { color: var(--accent2); font-weight: 600; }
+.eq-total { color: var(--green);   font-size: 22px; font-weight: 800; }
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.stat {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+}
+.stat-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing:.5px; }
+.stat-val { font-size: 26px; font-weight: 800; margin-top: 3px; }
+.c-green  { color: var(--green); }
+.c-purple { color: var(--accent2); }
+.c-yellow { color: var(--yellow); }
+.c-blue   { color: var(--blue); }
+.c-red    { color: var(--red); }
+
+.verdict {
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.verdict.ok  { background:rgba(34,197,94,.08); border:2px solid var(--green); color:var(--green); }
+.verdict.bad { background:rgba(239,68,68,.08); border:2px solid var(--red);   color:var(--red); }
+.verdict-sub { font-size:13px; font-weight:400; color:var(--muted); margin-top:5px; }
+
+.compare {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.ci { flex:1; text-align:center; padding:14px 8px; }
+.ci-lbl { font-size:11px; color:var(--muted); text-transform:uppercase; }
+.ci-val { font-size:28px; font-weight:800; margin-top:4px; }
+.ci-divider { width:1px; background:var(--border); }
+
+.err-box {
+  background:rgba(239,68,68,.08);
+  border:1.5px solid var(--red);
+  border-radius:12px;
+  padding:14px;
+  color:var(--red);
+  font-size:14px;
+  margin-bottom:14px;
+  text-align:center;
+}
+.err-tip { font-size:12px; color:var(--muted); margin-top:8px; line-height:1.6; }
+
+.btn-close {
+  width:100%;
+  padding:14px;
+  background:var(--card2);
+  border:1.5px solid var(--border);
+  border-radius:var(--r);
+  color:var(--text);
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+  margin-top:4px;
+}
+.btn-close:active { transform:scale(.98); }
+
+/* camera off placeholder */
+.cam-off {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:10px; color:var(--muted);
+  background:#050510;
+}
+.cam-off .ico { font-size:48px; }
+.cam-off p { font-size:14px; text-align:center; line-height:1.6; padding:0 30px; }
+.btn-start-cam {
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 24px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="hdr">
+  <div>
+    <div class="hdr-title">🎓 ExamScan</div>
+    <div class="hdr-sub">Point camera at exam paper and tap Scan</div>
+  </div>
+</div>
+
+<!-- Live camera viewport -->
+<div class="cam-wrap">
+  <!-- Camera off placeholder -->
+  <div class="cam-off" id="cam-off">
+    <div class="ico">📷</div>
+    <p>Camera needed to scan exam papers.<br/>Tap below to start.</p>
+    <button class="btn-start-cam" onclick="startCamera()">Start Camera</button>
+  </div>
+
+  <video id="video" autoplay playsinline muted></video>
+
+  <!-- Scanning frame -->
+  <div class="scan-frame" id="scan-frame" style="display:none">
+    <div class="scan-box" id="scan-box">
+      <div class="c2"></div>
+      <div class="scan-line"></div>
+      <div class="scan-hint">Align marks inside the box</div>
+    </div>
+  </div>
+
+  <!-- Status badge -->
+  <div class="cam-status" id="cam-status" style="display:none">📡 Camera live</div>
+</div>
+
+<!-- Bottom controls -->
+<div class="bottom">
+  <!-- Mode tabs -->
+  <div class="tabs">
+    <div class="tab active" id="tab-count" onclick="setMode('count')">
+      <span class="t-icon">🔢</span>
+      <span class="t-label">Count & Total</span>
+    </div>
+    <div class="tab" id="tab-recount" onclick="setMode('recount')">
+      <span class="t-icon">🔍</span>
+      <span class="t-label">Recount</span>
+    </div>
+  </div>
+
+  <!-- Recount claimed input -->
+  <div class="recount-input" id="recount-input">
+    <label>Claimed total:</label>
+    <input type="number" id="claimed" placeholder="45" min="0" max="1000"/>
+  </div>
+
+  <!-- Scan button -->
+  <button class="btn-scan" id="scan-btn" onclick="doScan()" disabled>
+    <span id="btn-text">✨ Scan Marks</span>
+  </button>
+</div>
+
+<!-- Result popup -->
+<div class="overlay" id="overlay" onclick="maybeClose(event)">
+  <div class="popup" id="popup">
+    <div class="popup-handle"></div>
+    <div id="result"></div>
+    <button class="btn-close" onclick="closePopup()">✕ Close</button>
+  </div>
+</div>
+
+<canvas id="canvas" style="display:none"></canvas>
+
+<script>
+let mode   = 'count';
+let stream = null;
+let busy   = false;
+
+// ── Mode ─────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('tab-count').classList.toggle('active',   m === 'count');
+  document.getElementById('tab-recount').classList.toggle('active', m === 'recount');
+  document.getElementById('recount-input').classList.toggle('show', m === 'recount');
+}
+
+// ── Camera start ─────────────────────────────────────────
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+      audio: false
+    });
+    const vid = document.getElementById('video');
+    vid.srcObject = stream;
+    await vid.play();
+
+    document.getElementById('cam-off').style.display   = 'none';
+    document.getElementById('scan-frame').style.display = 'flex';
+    document.getElementById('cam-status').style.display = 'block';
+    document.getElementById('scan-btn').disabled = false;
+
+  } catch (err) {
+    alert('Camera permission denied.\n\nPlease allow camera access in your browser settings, then refresh the page.');
+    console.error(err);
+  }
+}
+
+// Auto-start camera on load
+window.addEventListener('load', () => {
+  // Small delay so page is ready
+  setTimeout(startCamera, 400);
+});
+
+// ── Capture current frame ────────────────────────────────
+function captureFrame() {
+  const vid    = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  canvas.width  = vid.videoWidth  || 1280;
+  canvas.height = vid.videoHeight || 720;
+  canvas.getContext('2d').drawImage(vid, 0, 0);
+  return canvas.toDataURL('image/jpeg', 0.92);
+}
+
+// ── Scan ─────────────────────────────────────────────────
+async function doScan() {
+  if (busy || !stream) return;
+
+  if (mode === 'recount') {
+    const claimed = document.getElementById('claimed').value;
+    if (!claimed || isNaN(claimed) || Number(claimed) < 0) {
+      document.getElementById('claimed').focus();
+      document.getElementById('claimed').style.borderColor = 'var(--red)';
+      setTimeout(() => document.getElementById('claimed').style.borderColor = '', 1500);
+      return;
+    }
+  }
+
+  busy = true;
+  const scanBox = document.getElementById('scan-box');
+  const status  = document.getElementById('cam-status');
+  const btnText = document.getElementById('btn-text');
+  const scanBtn = document.getElementById('scan-btn');
+
+  // UI: scanning state
+  scanBox.classList.add('scanning');
+  status.textContent = '🔍 Scanning...';
+  status.classList.add('scanning');
+  btnText.textContent = '⏳ Scanning...';
+  scanBtn.disabled = true;
+
+  const imageData = captureFrame();
+
+  try {
+    let endpoint = '/scan';
+    let body     = { image: imageData };
+
+    if (mode === 'recount') {
+      endpoint = '/recount';
+      body.claimed_total = parseFloat(document.getElementById('claimed').value);
+    }
+
+    const res  = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showError(data);
+    } else {
+      showResult(data);
+    }
+
+  } catch (e) {
+    showError({ error: 'Server not reachable', tip: 'Make sure the Flask server is running (python app.py)' });
+  } finally {
+    busy = false;
+    scanBox.classList.remove('scanning');
+    status.textContent = '📡 Camera live';
+    status.classList.remove('scanning');
+    btnText.textContent = '✨ Scan Marks';
+    scanBtn.disabled = false;
+  }
+}
+
+// ── Result popup ─────────────────────────────────────────
+function showResult(data) {
+  const el = document.getElementById('result');
+
+  const numsPart  = data.numbers.join(' + ');
+  const totalPart = data.total ?? data.actual_total;
+
+  if (mode === 'count') {
+    el.innerHTML = `
+      <div class="badge badge-purple">🔢 Count &amp; Total</div>
+      <div class="eq-box">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Marks scanned from paper:</div>
+        <span class="eq-nums">${numsPart}</span>
+        <span style="color:var(--muted)"> = </span>
+        <span class="eq-total">${totalPart}</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-lbl">Total</div><div class="stat-val c-green">${data.total}</div></div>
+        <div class="stat"><div class="stat-lbl">Questions</div><div class="stat-val c-purple">${data.count}</div></div>
+        <div class="stat"><div class="stat-lbl">Average</div><div class="stat-val c-yellow">${data.average}</div></div>
+        <div class="stat"><div class="stat-lbl">Highest</div><div class="stat-val c-blue">${data.maximum}</div></div>
+      </div>
+    `;
+  } else {
+    const ok   = data.matches;
+    const diff = data.difference;
+    el.innerHTML = `
+      <div class="badge ${ok ? 'badge-green' : 'badge-red'}">${ok ? '✅ Correct' : '❌ Mismatch'}</div>
+      <div class="verdict ${ok ? 'ok' : 'bad'}">
+        ${ok ? '✅ Marks are CORRECT' : '❌ Marks DO NOT MATCH'}
+        ${!ok ? `<div class="verdict-sub">Difference: ${diff > 0 ? '+' : ''}${diff} from claimed total</div>` : ''}
+      </div>
+      <div class="compare">
+        <div class="ci">
+          <div class="ci-lbl">Claimed</div>
+          <div class="ci-val c-yellow">${data.claimed_total}</div>
+        </div>
+        <div class="ci-divider"></div>
+        <div class="ci">
+          <div class="ci-lbl">Actual</div>
+          <div class="ci-val ${ok ? 'c-green' : 'c-red'}">${data.actual_total}</div>
+        </div>
+      </div>
+      <div class="eq-box">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Marks scanned:</div>
+        <span class="eq-nums">${numsPart}</span>
+        <span style="color:var(--muted)"> = </span>
+        <span class="eq-total">${data.actual_total}</span>
+      </div>
+    `;
+  }
+
+  openPopup();
+}
+
+function showError(data) {
+  document.getElementById('result').innerHTML = `
+    <div class="badge badge-red">⚠️ Scan Failed</div>
+    <div class="err-box">
+      <strong>${data.error || 'Could not read marks'}</strong>
+      <div class="err-tip">
+        ${data.tip || 'Try again with better lighting'}<br/><br/>
+        Tips:<br/>
+        • Hold phone <strong>directly above</strong> the paper<br/>
+        • Make sure the paper is <strong>flat &amp; well-lit</strong><br/>
+        • Numbers should be <strong>inside the scanning box</strong><br/>
+        • Avoid shadows and glare
+      </div>
+    </div>
+  `;
+  openPopup();
+}
+
+function openPopup()  { document.getElementById('overlay').classList.add('show'); }
+function closePopup() { document.getElementById('overlay').classList.remove('show'); }
+function maybeClose(e){ if (e.target === document.getElementById('overlay')) closePopup(); }
+</script>
+</body>
+</html>
