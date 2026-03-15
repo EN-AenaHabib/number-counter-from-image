@@ -229,5 +229,5 @@ def recount():
 
 if __name__ == "__main__":
     os.makedirs("static", exist_ok=True)
-    print("\n🎓  ExamScan  →  http://localhost:5000\n")
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
