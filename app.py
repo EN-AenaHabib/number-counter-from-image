@@ -67,7 +67,7 @@ def parse_numbers(text):
 
 
 def extract_numbers_from_image(img_array):
-    variants    = preprocess_for_handwriting(img_array)
+    variants     = preprocess_for_handwriting(img_array)
     best_numbers = []
     best_text    = ""
     for variant in variants:
@@ -101,7 +101,7 @@ def calculate_results(numbers):
 
 
 def do_recount(numbers, claimed_total):
-    actual = sum(numbers)
+    actual  = sum(numbers)
     claimed = float(claimed_total)
     diff    = round(actual - claimed, 2)
     return {
@@ -128,10 +128,11 @@ def decode_image(b64_string):
 
 @app.route("/")
 def index():
-    html_path = os.path.join(BASE_DIR, "static", "index.html")
+    # index.html is in the root folder (same level as app.py)
+    html_path = os.path.join(BASE_DIR, "index.html")
     if not os.path.exists(html_path):
         files = os.listdir(BASE_DIR)
-        return f"<h2>index.html not found</h2><p>Files in root: {files}</p>", 500
+        return f"<h2>index.html not found</h2><p>Files: {files}</p>", 500
     with open(html_path, "r", encoding="utf-8") as f:
         return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
 
@@ -145,7 +146,10 @@ def scan():
             return jsonify({"error": "Could not decode image"}), 400
         numbers, raw = extract_numbers_from_image(img)
         if not numbers:
-            return jsonify({"error": "No numbers found", "tip": "Ensure good lighting and clear handwriting"}), 422
+            return jsonify({
+                "error": "No numbers found",
+                "tip"  : "Ensure good lighting and clear handwriting"
+            }), 422
         res = calculate_results(numbers)
         res["raw_text"] = raw
         return jsonify(res)
@@ -165,7 +169,10 @@ def recount():
             return jsonify({"error": "Could not decode image"}), 400
         numbers, raw = extract_numbers_from_image(img)
         if not numbers:
-            return jsonify({"error": "No numbers found", "tip": "Ensure good lighting and clear handwriting"}), 422
+            return jsonify({
+                "error": "No numbers found",
+                "tip"  : "Ensure good lighting and clear handwriting"
+            }), 422
         res = do_recount(numbers, claimed)
         res["raw_text"] = raw
         return jsonify(res)
@@ -176,6 +183,4 @@ def recount():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     print(f"\n🎓  ExamScan  →  http://localhost:{port}\n")
-    print(f"   BASE_DIR  : {BASE_DIR}")
-    print(f"   static/   : {os.path.join(BASE_DIR, 'static')}")
     app.run(host="0.0.0.0", port=port)
